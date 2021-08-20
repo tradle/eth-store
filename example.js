@@ -1,6 +1,6 @@
 const EthStore = require('./index')
 // const EthQuery = require('./query')
-const ZeroClient = require('web3-provider-engine/zero')
+const ZeroClient = require('@tradle/web3-provider-engine/zero')
 
 var engine = ZeroClient({
   rpcUrl: 'https://testrpc.metamask.io/',
