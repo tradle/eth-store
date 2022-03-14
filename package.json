@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "kumavis",
+  "contributors": [
+    "Mark Vayngrib <mark@tradle.io>",
+    "Martin Heidegger <martin.heidegger@gmail.com>"
+  ],
   "license": "ISC",
   "dependencies": {
     "async": "^1.5.2",
