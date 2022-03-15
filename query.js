@@ -172,7 +172,7 @@ function createID () {
 
 function toHex (input) {
   if (typeof input === 'number') {
-    return '0x' + input.toString(16)
+    return ethUtil.intToHex(input)
   }
   return input
 }

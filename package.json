@@ -23,9 +23,9 @@
   ],
   "license": "ISC",
   "dependencies": {
-    "clone": "^1.0.2",
+    "clone": "^2.1.2",
     "debug": "^4.3.3",
-    "ethereumjs-util": "^4.4.0"
+    "ethereumjs-util": "^7.1.4"
   },
   "devDependencies": {
     "@tradle/web3-provider-engine": "^16.0.4",
