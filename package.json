@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test": "npm run lint && npm run example",
+    "example": "node example.js",
+    "lint": "standard"
   },
   "exports": {
     ".": {
