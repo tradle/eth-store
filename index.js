@@ -6,106 +6,87 @@ some design questions
 - should we emit events per key?
 
 */
-
-const EventEmitter = require('events').EventEmitter
-const inherits = require('util').inherits
-const async = require('async')
+const { EventEmitter } = require('events')
+const debug = require('debug')('tradle:eth-store')
 const clone = require('clone')
 const EthQuery = require('./query')
 
-module.exports = EthereumStore
+module.exports = class EthereumStore extends EventEmitter {
+  constructor (blockTracker, provider) {
+    super()
+    this._subscriptions = {}
+    this._currentState = {}
+    this._provider = provider
+    this.query = (new EthQuery(provider))
+    const _onBlock = block => {
+      this._updateForBlock(block).catch(err => {
+        debug('Error while updating block', err)
+        this.emit('warn', err)
+      })
+    }
+    blockTracker.on('block', _onBlock)
+    const _onError = error => {
+      this.emit('warn', error)
+    }
+    blockTracker.on('error', _onError)
+    this.destroy = () => {
+      blockTracker.off('block', _onBlock)
+      blockTracker.off('error', _onError)
+    }
+  }
 
+  //
+  // public
+  //
 
-inherits(EthereumStore, EventEmitter)
-function EthereumStore(blockTracker, provider) {
-  const self = this
-  EventEmitter.call(self)
-  self._subscriptions = {}
-  self._currentState = {}
-  self._provider = provider
-  self.query = (new EthQuery(provider))
-  // TODO: never run more than one _updateForBlock at a time
-  blockTracker.on('block', self._updateForBlock.bind(self))
+  getState () {
+    return clone(this._currentState)
+  }
+
+  get (key) {
+    return this._currentState[key]
+  }
+
+  put (key, payload) {
+    this._subscriptions[key] = payload
+    this._currentState[key] = undefined
+    this.emit('update', this.getState())
+    this._makeRequest(key, payload).catch(err => {
+      debug('Error putting block', err)
+      this.emit('warn', err)
+    })
+  }
+
+  del (key) {
+    delete this._subscriptions[key]
+    delete this._currentState[key]
+    this.emit('update', this.getState())
+  }
+
+  //
+  // private
+  //
+
+  async _updateForBlock (block) {
+    // TODO: never run more than one _updateForBlock at a time
+    const blockNumber = '0x' + block.number.toString('hex')
+    this.currentBlockNumber = blockNumber
+
+    await Promise.all(
+      Object.entries(this._subscriptions)
+        .filter(([_key, payload]) => Boolean(payload))
+        .map(([key, payload]) => this._makeRequest(key, payload))
+    )
+    // this._currentState = newState
+    this.emit('block', this.getState())
+  }
+
+  // TODO: should lock to specified block
+  async _makeRequest (key, payload) {
+    debug('making request for', key, payload)
+    const result = await this.query.sendAsync(payload)
+    debug('result for', key, payload, result)
+    this._currentState[key] = result
+    return result
+  }
 }
-
-//
-// public
-//
-
-EthereumStore.prototype.getState = function(){
-  const self = this
-  return clone(self._currentState)
-}
-
-EthereumStore.prototype.get = function(key){
-  const self = this
-  return self._currentState[key]
-}
-
-EthereumStore.prototype.put = function(key, payload){
-  const self = this
-  self._subscriptions[key] = payload
-  self._currentState[key] = undefined
-  self._didUpdate()
-  self._makeRequest(key, payload)
-}
-
-EthereumStore.prototype.del = function(key){
-  const self = this
-  delete self._subscriptions[key]
-  delete self._currentState[key]
-  self._didUpdate()
-}
-
-
-//
-// private
-//
-
-EthereumStore.prototype._didUpdate = function() {
-  const self = this
-  var state = self.getState()
-  self.emit('update', state)
-}
-
-EthereumStore.prototype._didUpdateBlock = function() {
-  const self = this
-  var state = self.getState()
-  self.emit('block', state)
-}
-
-EthereumStore.prototype._updateForBlock = function(block) {
-  const self = this
-  var blockNumber = '0x'+block.number.toString('hex')
-  self.currentBlockNumber = blockNumber
-  async.map(Object.keys(self._subscriptions), function(key, cb){
-    // console.log('async.map', arguments)
-    var payload = self._subscriptions[key]
-    if (!payload) return cb()
-    self._makeRequest(key, payload, cb)
-  }, function(err, newState){
-    if (err) return console.error(err)
-    // self._currentState = newState
-    self._didUpdateBlock()
-  })
-}
-
-// TODO: should lock to specified block
-EthereumStore.prototype._makeRequest = function(key, payload, cb){
-  // console.log('_makeRequest', arguments)
-  const self = this
-  cb = cb || noop
-  self.query.sendAsync(payload, function(err, result){
-    if (err) return cb(err)
-    self._currentState[key] = result
-    cb(null, result)
-  })
-}
-
-// util
-
-function valuesFor(obj){
-  return Object.keys(obj).map(function(key){ return obj[key] })
-}
-
-function noop(){}
